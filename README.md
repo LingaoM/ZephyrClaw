@@ -1,6 +1,6 @@
-# ZephyrClaw
+# ZBot
 
-An open-source embedded AI agent running on the **Nordic nRF7002-DK** development board, powered by **Zephyr RTOS**. ZephyrClaw implements a ReAct (Reason + Act) loop that connects to any OpenAI-compatible LLM API over WiFi and can control hardware, maintain conversation memory across reboots, and run multi-step skills.
+An open-source embedded AI agent running on the **Nordic nRF7002-DK** development board, powered by **Zephyr RTOS**. ZBot implements a ReAct (Reason + Act) loop that connects to any OpenAI-compatible LLM API over WiFi and can control hardware, maintain conversation memory across reboots, and run multi-step skills.
 
 **Target board:** nRF7002-DK (nRF5340 + nRF7002 WiFi)
 **RTOS:** [Zephyr](https://zephyrproject.org) ≥ 3.6
@@ -12,25 +12,25 @@ An open-source embedded AI agent running on the **Nordic nRF7002-DK** developmen
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│                    ZephyrClaw Agent                   │
-│                                                       │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐   │
-│  │  Config  │  │  Memory  │  │   LLM Client      │   │
-│  │ endpoint │  │ K_FIFO   │  │  HTTP → OpenAI    │   │
-│  │ model    │  │ pool+    │  │  compatible API   │   │
-│  │ api key  │  │ settings │  │                   │   │
-│  └──────────┘  └──────────┘  └──────────────────┘   │
-│                                                       │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐   │
-│  │  Tools   │  │  Skills  │  │  Agent (ReAct)    │   │
-│  │ gpio_read│  │ blink    │  │  Reason→Act loop  │   │
-│  │ gpio_writ│  │ sos      │  │  tool calling     │   │
-│  │ get_heap │  │ status   │  │  auto-summarise   │   │
-│  │ board_inf│  │ clear_mem│  │                   │   │
-│  └──────────┘  └──────────┘  └──────────────────┘   │
-│                                                       │
+│                    ZBot Agent                        │
+│                                                      │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐    │
+│  │  Config  │  │  Memory  │  │   LLM Client     │    │
+│  │ endpoint │  │ K_FIFO   │  │  HTTP → OpenAI   │    │
+│  │ model    │  │ pool+    │  │  compatible API  │    │
+│  │ api key  │  │ settings │  │                  │    │
+│  └──────────┘  └──────────┘  └──────────────────┘    │
+│                                                      │
+│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐    │
+│  │  Tools   │  │  Skills  │  │  Agent (ReAct)   │    │
+│  │ gpio_read│  │ blink    │  │  Reason→Act loop │    │
+│  │ gpio_writ│  │ sos      │  │  tool calling    │    │
+│  │ get_heap │  │ status   │  │  auto-summarise  │    │
+│  │ board_inf│  │ clear_mem│  │                  │    │
+│  └──────────┘  └──────────┘  └──────────────────┘    │
+│                                                      │
 │  ┌────────────────────────────────────────────────┐  │
-│  │  Shell Commands  (claw key / chat / skill ...)  │  │
+│  │  Shell Commands  (zbot key / chat / skill ...) │  │
 │  └────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────┘
 ```
@@ -45,7 +45,7 @@ An open-source embedded AI agent running on the **Nordic nRF7002-DK** developmen
 | **Tools** | `tools.h/c` | Atomic hardware actions: GPIO, uptime, heap, board info |
 | **Skills** | `skill.h/c` | Multi-step reusable workflows (blink, SOS, status, clear) |
 | **Agent** | `agent.h/c` | ReAct loop: reason → call tool → observe → repeat → summarise |
-| **Shell** | `shell_cmd.c` | All `claw` shell subcommands |
+| **Shell** | `shell_cmd.c` | All `zbot` shell subcommands |
 
 ### ReAct Loop
 
@@ -53,11 +53,11 @@ An open-source embedded AI agent running on the **Nordic nRF7002-DK** developmen
 user input
     │
     ▼
-build messages JSON  ←──────────────────────────────┐
-    │                                                │
-    ▼                                                │
-LLM API call (tools enabled)                        │
-    │                                                │
+build messages JSON  ←────────────────────────────────────────────────┐
+    │                                                                 │
+    ▼                                                                 │
+LLM API call (tools enabled)                                          │
+    │                                                                 |
     ├── finish_reason: tool_call ──► execute tool ──► append result ──┘
     │
     └── finish_reason: stop ──► return answer to user
@@ -78,16 +78,16 @@ When `k_mem_slab_alloc` fails on `memory_add_turn()`:
 
 After each compression, the rolling summary is written to NVS and injected as prior context on the next boot.
 
-**Settings layout (subtree "zc"):**
+**Settings layout:**
 
 | Settings key | Type | Notes |
 |---|---|---|
-| `zc/summary` | `char[768]` | Conversation summary (managed by memory.c) |
-| `zc/apikey` | `char[256]` | Optional — only saved via `claw key-save` |
-| `zc/wifi/ssid` | `char[33]` | Saved by `claw wifi connect` |
-| `zc/wifi/pass` | `char[65]` | Saved by `claw wifi connect` |
+| `zbot/summary` | `char[768]` | Conversation summary (managed by memory.c) |
+| `zbot/apikey` | `char[256]` | Optional — only saved via `zbot key-save` |
+| `wifi/...` | — | WiFi credentials managed by Zephyr `wifi_credentials` subsystem |
 
-The API key is RAM-only by default; use `claw key-save` to optionally persist it.
+The API key is RAM-only by default; use `zbot key-save` to optionally persist it.
+WiFi credentials are stored by `CONFIG_WIFI_CREDENTIALS` (separate from the `zbot` subtree).
 
 ---
 
@@ -96,7 +96,7 @@ The API key is RAM-only by default; use `claw key-save` to optionally persist it
 Set up a Zephyr development environment following the official guide:
 https://docs.zephyrproject.org/latest/develop/getting_started/index.html
 
-The latest Zephyr version is recommended. Once your environment is ready, clone ZephyrClaw into your workspace and proceed below.
+The latest Zephyr version is recommended. Once your environment is ready, clone zbot into your workspace and proceed below.
 
 ---
 
@@ -107,7 +107,7 @@ The latest Zephyr version is recommended. Once your environment is ready, clone 
 From the Zephyr workspace root:
 
 ```bash
-west build -b nrf7002dk/nrf5340/cpuapp zephyrclaw
+west build -b nrf7002dk/nrf5340/cpuapp zbot
 west flash
 ```
 
@@ -122,7 +122,7 @@ screen /dev/ttyACM0 115200
 ### 3. Connect to WiFi
 
 ```
-uart:~$ claw wifi connect <SSID> <password>
+uart:~$ zbot wifi connect <SSID> <password>
 ```
 
 Credentials are saved to flash. On the next reboot, the board auto-connects without any manual command.
@@ -130,82 +130,82 @@ Credentials are saved to flash. On the next reboot, the board auto-connects with
 ### 4. Set API Key
 
 ```
-uart:~$ claw key sk-...
+uart:~$ zbot key sk-...
 ```
 
-The key is held in RAM only and lost on reboot. Use `claw key-save` to persist it to flash.
+The key is held in RAM only and lost on reboot. Use `zbot key-save` to persist it to flash.
 
 ### 5. (Optional) Configure Endpoint
 
 Default endpoint is `api.openai.com:443`. To use OpenAI directly:
 
 ```
-uart:~$ claw host api.openai.com
-uart:~$ claw path /v1/chat/completions
-uart:~$ claw model gpt-4o-mini
-uart:~$ claw tls on 443
+uart:~$ zbot host api.openai.com
+uart:~$ zbot path /v1/chat/completions
+uart:~$ zbot model gpt-4o-mini
+uart:~$ zbot tls on 443
 ```
 
 For a local model (e.g. Ollama):
 
 ```
-uart:~$ claw host 192.168.1.100
-uart:~$ claw tls off 11434
+uart:~$ zbot host 192.168.1.100
+uart:~$ zbot tls off 11434
 ```
 
 ### 6. Chat
 
 ```
-uart:~$ claw chat Hello! What can you do?
-uart:~$ claw chat Turn on LED0
-uart:~$ claw chat What is the board uptime?
+uart:~$ zbot chat Hello! What can you do?
+uart:~$ zbot chat Turn on LED0
+uart:~$ zbot chat What is the board uptime?
 ```
 
 ---
 
 ## Shell Commands
 
-All commands are subcommands of `claw`.
+All commands are subcommands of `zbot`.
 
 ### Configuration
 
 | Command | Description |
 |---------|-------------|
-| `claw key <key>` | Set API key (RAM only, not persisted) |
-| `claw key-save` | Save current API key to flash |
-| `claw key-delete` | Delete API key from flash |
-| `claw host <hostname>` | Set LLM endpoint host |
-| `claw path <path>` | Set LLM API path |
-| `claw model <name>` | Set model name |
-| `claw provider <id>` | Set `X-Model-Provider-Id` header |
-| `claw tls <on\|off> [port]` | Enable/disable TLS and set port |
-| `claw status` | Show current config and agent state |
+| `zbot key <key>` | Set API key (RAM only, not persisted) |
+| `zbot key-save` | Save current API key to flash |
+| `zbot key-delete` | Delete API key from flash |
+| `zbot host <hostname>` | Set LLM endpoint host |
+| `zbot path <path>` | Set LLM API path |
+| `zbot model <name>` | Set model name |
+| `zbot provider <id>` | Set `X-Model-Provider-Id` header |
+| `zbot tls <on\|off> [port]` | Enable/disable TLS and set port |
+| `zbot status` | Show current config and agent state |
 
 ### WiFi
 
 | Command | Description |
 |---------|-------------|
-| `claw wifi connect <ssid> [pass]` | Connect to WiFi and save credentials to flash |
-| `claw wifi disconnect` | Disconnect from current WiFi network |
-| `claw wifi status` | Show saved SSID |
+| `zbot wifi connect <ssid> [pass]` | Connect to WiFi and save credentials to flash |
+| `zbot wifi disconnect` | Disconnect from current WiFi network |
+| `zbot wifi status` | Show saved SSID |
 
 ### Conversation
 
 | Command | Description |
 |---------|-------------|
-| `claw chat <message>` | Send a message to the agent |
-| `claw history` | Print in-RAM conversation history |
-| `claw summary` | Show the NVS-persisted session summary |
-| `claw clear` | Clear RAM history (keeps NVS summary) |
-| `claw wipe` | Wipe all history and NVS summary |
+| `zbot chat <message>` | Send a message to the agent |
+| `zbot history` | Print in-RAM conversation history |
+| `zbot summary` | Show the NVS-persisted session summary |
+| `zbot clear` | Clear RAM history (keeps NVS summary) |
+| `zbot wipe` | Wipe all history and NVS summary |
 
 ### Skills & Tools
 
 | Command | Description |
 |---------|-------------|
-| `claw skill list` | List all registered skills |
-| `claw skill run <name> [arg]` | Run a skill directly |
-| `claw tools` | List all available tools with descriptions |
+| `zbot skill list` | List all registered skills |
+| `zbot skill run <name> [arg]` | Run a skill directly |
+| `zbot tools` | List all available tools with descriptions |
 
 ---
 
@@ -236,14 +236,14 @@ Skills are multi-step workflows invocable by name.
 | `clear_memory` | — | Wipe conversation history and NVS summary |
 
 ```
-uart:~$ claw skill run blink_led 5
-uart:~$ claw skill run sos
-uart:~$ claw skill run system_status
+uart:~$ zbot skill run blink_led 5
+uart:~$ zbot skill run sos
+uart:~$ zbot skill run system_status
 ```
 
 ---
 
-## Extending ZephyrClaw
+## Extending zbot
 
 ### Adding a Custom Tool
 
@@ -284,8 +284,8 @@ skill_register("my_skill", "Description of what it does", my_skill);
 
 ## Security Notes
 
-- **API key** is RAM-only by default. It is cleared on power cycle and never written to flash unless you explicitly run `claw key-save`.
-- **WiFi passphrase** is stored in flash as plain text when you use `claw wifi connect`. Anyone with physical flash access can read it. Acceptable for dev boards; use additional protections in production.
+- **API key** is RAM-only by default. It is cleared on power cycle and never written to flash unless you explicitly run `zbot key-save`.
+- **WiFi passphrase** is stored in flash as plain text when you use `zbot wifi connect`. Anyone with physical flash access can read it. Acceptable for dev boards; use additional protections in production.
 - **TLS peer verification** is set to `NONE` by default (development mode). For production, supply a CA certificate and change verify mode to `TLS_PEER_VERIFY_REQUIRED`.
 - **NVS summary** is stored as plain text. Avoid sensitive information in conversations if flash readout is a concern.
 
@@ -294,7 +294,7 @@ skill_register("my_skill", "Description of what it does", my_skill);
 ## Project Structure
 
 ```
-zephyrclaw/
+zbot/
 ├── CMakeLists.txt
 ├── prj.conf                              # Zephyr Kconfig (all targets)
 ├── sysbuild.conf
@@ -308,5 +308,5 @@ zephyrclaw/
     ├── tools.h/c       # Hardware tool primitives
     ├── skill.h/c       # Multi-step skill framework
     ├── agent.h/c       # ReAct reasoning loop + system prompt
-    └── shell_cmd.c     # `claw` shell command tree
+    └── shell_cmd.c     # `zbot` shell command tree
 ```

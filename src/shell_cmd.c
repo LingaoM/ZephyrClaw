@@ -1,33 +1,32 @@
 /*
- * Copyright (c) 2026 LingaoMeng
+ * Copyright (c) 2026 Lingao Meng
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * ZephyrClaw - Shell Commands
+ * ZBot - Shell Commands
  *
- * All user-facing commands are under the "claw" root command.
+ * All user-facing commands are under the "zbot" root command.
  *
  * Usage:
- *   claw key <api-key>                -- Set API key (RAM only)
- *   claw key-save                     -- Persist API key to flash
- *   claw key-delete                   -- Delete API key from flash
- *   claw host <hostname>              -- Set LLM endpoint host
- *   claw path <path>                  -- Set LLM API path
- *   claw model <model>                -- Set model name
- *   claw provider <id>                -- Set X-Model-Provider-Id header
- *   claw tls <on|off> [port]          -- Configure TLS
- *   claw status                       -- Show current config status
- *   claw wifi connect <ssid> [pass]   -- Connect to WiFi (saves credentials)
- *   claw wifi disconnect              -- Disconnect from WiFi
- *   claw wifi status                  -- Show saved SSID and connection state
- *   claw chat <message>               -- Send a message to the agent
- *   claw history                      -- Show conversation history
- *   claw summary                      -- Show persisted NVS summary
- *   claw clear                        -- Clear conversation history
- *   claw wipe                         -- Wipe history + NVS summary
- *   claw skill list                   -- List all registered skills
- *   claw skill run <name> [arg]       -- Run a skill directly
- *   claw tools                        -- List all available tools
+ *   zbot key <api-key>                -- Set API key (persisted to flash)
+ *   zbot key-delete                   -- Delete API key from flash
+ *   zbot host <hostname>              -- Set LLM endpoint host
+ *   zbot path <path>                  -- Set LLM API path
+ *   zbot model <model>                -- Set model name
+ *   zbot provider <id>                -- Set X-Model-Provider-Id header
+ *   zbot tls <on|off> [port]          -- Configure TLS
+ *   zbot status                       -- Show current config status
+ *   zbot wifi connect <ssid> [pass]   -- Connect to WiFi (saves credentials)
+ *   zbot wifi disconnect              -- Disconnect from WiFi
+ *   zbot wifi status                  -- Show saved SSID and connection state
+ *   zbot chat <message>               -- Send a message to the agent
+ *   zbot history                      -- Show conversation history
+ *   zbot summary                      -- Show persisted NVS summary
+ *   zbot clear                        -- Clear conversation history
+ *   zbot wipe                         -- Wipe history + NVS summary
+ *   zbot skill list                   -- List all registered skills
+ *   zbot skill run <name> [arg]       -- Run a skill directly
+ *   zbot tools                        -- List all available tools
  */
 
 #include <zephyr/kernel.h>
@@ -37,16 +36,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <zephyr/net/wifi_credentials.h>
+
 #include "config.h"
 #include "memory.h"
 #include "agent.h"
 #include "tools.h"
 #include "skill.h"
 
-LOG_MODULE_REGISTER(zephyrclaw_shell, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(zbot_shell, LOG_LEVEL_INF);
 
 /* ------------------------------------------------------------------ */
-/* claw key */
+/* zbot key */
 /* ------------------------------------------------------------------ */
 
 static int cmd_key(const struct shell *sh, size_t argc, char **argv)
@@ -54,16 +55,13 @@ static int cmd_key(const struct shell *sh, size_t argc, char **argv)
 	int rc;
 
 	if (argc < 2) {
-		shell_print(sh, "Usage: claw key <api-key>");
-		shell_print(sh, "The key is stored in RAM only and not persisted.");
+		shell_print(sh, "Usage: zbot key <api-key>");
 		return -EINVAL;
 	}
 
 	rc = config_set_api_key(argv[1]);
 	if (rc == 0) {
-		shell_print(sh,
-			    "API key set (%zu chars). RAM only — use 'claw key-save' to persist.",
-			    strlen(argv[1]));
+		shell_print(sh, "API key set (%zu chars) and saved to flash.", strlen(argv[1]));
 	} else {
 		shell_error(sh, "Failed to set key: %d", rc);
 	}
@@ -71,32 +69,7 @@ static int cmd_key(const struct shell *sh, size_t argc, char **argv)
 }
 
 /* ------------------------------------------------------------------ */
-/* claw key-save  — save current API key to NVS flash */
-/* ------------------------------------------------------------------ */
-
-static int cmd_key_save(const struct shell *sh, size_t argc, char **argv)
-{
-	int rc;
-
-	ARG_UNUSED(argc);
-	ARG_UNUSED(argv);
-
-	if (!config_has_api_key()) {
-		shell_error(sh, "No API key set. Use 'claw key <key>' first.");
-		return -EINVAL;
-	}
-
-	rc = config_save_api_key(config_get()->api_key);
-	if (rc == 0) {
-		shell_print(sh, "API key saved to flash.");
-	} else {
-		shell_error(sh, "Failed to save: %d", rc);
-	}
-	return rc;
-}
-
-/* ------------------------------------------------------------------ */
-/* claw key-delete — remove API key from NVS flash */
+/* zbot key-delete — remove API key from NVS flash */
 /* ------------------------------------------------------------------ */
 
 static int cmd_key_delete(const struct shell *sh, size_t argc, char **argv)
@@ -112,7 +85,7 @@ static int cmd_key_delete(const struct shell *sh, size_t argc, char **argv)
 }
 
 /* ------------------------------------------------------------------ */
-/* claw host */
+/* zbot host */
 /* ------------------------------------------------------------------ */
 
 static int cmd_host(const struct shell *sh, size_t argc, char **argv)
@@ -120,8 +93,8 @@ static int cmd_host(const struct shell *sh, size_t argc, char **argv)
 	int rc;
 
 	if (argc < 2) {
-		shell_print(sh, "Usage: claw host <hostname>");
-		shell_print(sh, "Example: claw host api.openai.com");
+		shell_print(sh, "Usage: zbot host <hostname>");
+		shell_print(sh, "Example: zbot host api.openai.com");
 		return -EINVAL;
 	}
 
@@ -135,7 +108,7 @@ static int cmd_host(const struct shell *sh, size_t argc, char **argv)
 }
 
 /* ------------------------------------------------------------------ */
-/* claw path */
+/* zbot path */
 /* ------------------------------------------------------------------ */
 
 static int cmd_path(const struct shell *sh, size_t argc, char **argv)
@@ -143,8 +116,8 @@ static int cmd_path(const struct shell *sh, size_t argc, char **argv)
 	int rc;
 
 	if (argc < 2) {
-		shell_print(sh, "Usage: claw path <path>");
-		shell_print(sh, "Example: claw path /v1/chat/completions");
+		shell_print(sh, "Usage: zbot path <path>");
+		shell_print(sh, "Example: zbot path /v1/chat/completions");
 		return -EINVAL;
 	}
 
@@ -158,7 +131,7 @@ static int cmd_path(const struct shell *sh, size_t argc, char **argv)
 }
 
 /* ------------------------------------------------------------------ */
-/* claw model */
+/* zbot model */
 /* ------------------------------------------------------------------ */
 
 static int cmd_model(const struct shell *sh, size_t argc, char **argv)
@@ -166,8 +139,8 @@ static int cmd_model(const struct shell *sh, size_t argc, char **argv)
 	int rc;
 
 	if (argc < 2) {
-		shell_print(sh, "Usage: claw model <model-name>");
-		shell_print(sh, "Example: claw model gpt-4o-mini");
+		shell_print(sh, "Usage: zbot model <model-name>");
+		shell_print(sh, "Example: zbot model gpt-4o-mini");
 		return -EINVAL;
 	}
 
@@ -181,7 +154,7 @@ static int cmd_model(const struct shell *sh, size_t argc, char **argv)
 }
 
 /* ------------------------------------------------------------------ */
-/* claw provider */
+/* zbot provider */
 /* ------------------------------------------------------------------ */
 
 static int cmd_provider(const struct shell *sh, size_t argc, char **argv)
@@ -189,8 +162,8 @@ static int cmd_provider(const struct shell *sh, size_t argc, char **argv)
 	int rc;
 
 	if (argc < 2) {
-		shell_print(sh, "Usage: claw provider <provider-id>");
-		shell_print(sh, "Example: claw provider azure_openai");
+		shell_print(sh, "Usage: zbot provider <provider-id>");
+		shell_print(sh, "Example: zbot provider azure_openai");
 		shell_print(sh, "Sets the X-Model-Provider-Id request header.");
 		return -EINVAL;
 	}
@@ -205,7 +178,7 @@ static int cmd_provider(const struct shell *sh, size_t argc, char **argv)
 }
 
 /* ------------------------------------------------------------------ */
-/* claw tls */
+/* zbot tls */
 /* ------------------------------------------------------------------ */
 
 static int cmd_tls(const struct shell *sh, size_t argc, char **argv)
@@ -214,7 +187,7 @@ static int cmd_tls(const struct shell *sh, size_t argc, char **argv)
 	uint16_t port;
 
 	if (argc < 2) {
-		shell_print(sh, "Usage: claw tls <on|off> [port]");
+		shell_print(sh, "Usage: zbot tls <on|off> [port]");
 		return -EINVAL;
 	}
 
@@ -226,13 +199,19 @@ static int cmd_tls(const struct shell *sh, size_t argc, char **argv)
 		port = (uint16_t)strtoul(argv[2], NULL, 10);
 	}
 
-	config_set_tls(use_tls, port);
-	shell_print(sh, "TLS: %s, port: %u", use_tls ? "on" : "off", port);
-	return 0;
+	int rc = config_set_tls(use_tls, port);
+
+	if (rc == 0) {
+		shell_print(sh, "TLS: %s, port: %u (saved to flash)", use_tls ? "on" : "off",
+			    port);
+	} else {
+		shell_error(sh, "Failed to persist TLS config: %d", rc);
+	}
+	return rc;
 }
 
 /* ------------------------------------------------------------------ */
-/* claw status */
+/* zbot status */
 /* ------------------------------------------------------------------ */
 
 static int cmd_status(const struct shell *sh, size_t argc, char **argv)
@@ -245,43 +224,39 @@ static int cmd_status(const struct shell *sh, size_t argc, char **argv)
 }
 
 /* ------------------------------------------------------------------ */
-/* claw chat — runs agent on system workqueue to avoid shell stack OVF */
+/* zbot chat — runs agent on system workqueue to avoid shell stack OVF */
 /* ------------------------------------------------------------------ */
 
 struct chat_work_item {
-	struct k_work work;
+        int rc;
 	char input[AGENT_INPUT_MAX_LEN];
 	char response[AGENT_OUTPUT_MAX_LEN];
-	int rc;
 	struct k_sem done;
 };
 
 static struct chat_work_item g_chat_work;
 
-static void chat_work_handler(struct k_work *work)
+static void agent_response(int err, struct agent_response_ctx *ctx)
 {
-	struct chat_work_item *item = CONTAINER_OF(work, struct chat_work_item, work);
-	item->rc = agent_run_sync(item->input, item->response, sizeof(item->response));
-	k_sem_give(&item->done);
+	struct chat_work_item *chat = ctx->user_data;
+
+	chat->rc = err;
+	k_sem_give(&chat->done);
 }
 
 static int cmd_chat(const struct shell *sh, size_t argc, char **argv)
 {
 	size_t pos;
+        int rc;
 
 	if (argc < 2) {
-		shell_print(sh, "Usage: claw chat <message>");
+		shell_print(sh, "Usage: zbot chat <message>");
 		return -EINVAL;
 	}
 
 	if (!config_has_api_key()) {
-		shell_error(sh, "API key not set. Run: claw key <your-api-key>");
+		shell_error(sh, "API key not set. Run: zbot key <your-api-key>");
 		return -EACCES;
-	}
-
-	if (agent_is_busy()) {
-		shell_error(sh, "Agent is busy processing another request.");
-		return -EBUSY;
 	}
 
 	/* Concatenate all argv[1..] into a single message */
@@ -301,6 +276,7 @@ static int cmd_chat(const struct shell *sh, size_t argc, char **argv)
 		memcpy(g_chat_work.input + pos, argv[i], len);
 		pos += len;
 	}
+
 	g_chat_work.input[pos] = '\0';
 
 	shell_print(sh, "You: %s", g_chat_work.input);
@@ -309,8 +285,19 @@ static int cmd_chat(const struct shell *sh, size_t argc, char **argv)
 	/* Submit to system workqueue (CONFIG_SYSTEM_WORKQUEUE_STACK_SIZE)
 	 * so the heavy HTTP + JSON work runs off the shell stack. */
 	k_sem_init(&g_chat_work.done, 0, 1);
-	k_work_init(&g_chat_work.work, chat_work_handler);
-	k_work_submit(&g_chat_work.work);
+
+	struct agent_response_ctx ctx = {
+		.output        = g_chat_work.response,
+		.output_length = sizeof(g_chat_work.response),
+		.cb            = agent_response,
+		.user_data     = &g_chat_work,
+	};
+
+	rc = agent_submit_input(g_chat_work.input, &ctx);
+        if (rc) {
+		shell_error(sh, "Agent submit input error");
+		return -EACCES;
+        }
 
 	/* Block shell thread until workqueue finishes (timeout 60s) */
 	if (k_sem_take(&g_chat_work.done, K_SECONDS(60)) != 0) {
@@ -324,14 +311,14 @@ static int cmd_chat(const struct shell *sh, size_t argc, char **argv)
 			shell_print(sh, "%s", g_chat_work.response);
 		}
 	} else {
-		shell_print(sh, "\nZephyrClaw: %s\n", g_chat_work.response);
+		shell_print(sh, "\nzbot: %s\n", g_chat_work.response);
 	}
 
 	return g_chat_work.rc;
 }
 
 /* ------------------------------------------------------------------ */
-/* claw history */
+/* zbot history */
 /* ------------------------------------------------------------------ */
 
 static int cmd_history(const struct shell *sh, size_t argc, char **argv)
@@ -343,7 +330,7 @@ static int cmd_history(const struct shell *sh, size_t argc, char **argv)
 }
 
 /* ------------------------------------------------------------------ */
-/* claw summary */
+/* zbot summary */
 /* ------------------------------------------------------------------ */
 
 static int cmd_summary(const struct shell *sh, size_t argc, char **argv)
@@ -359,7 +346,7 @@ static int cmd_summary(const struct shell *sh, size_t argc, char **argv)
 }
 
 /* ------------------------------------------------------------------ */
-/* claw clear */
+/* zbot clear */
 /* ------------------------------------------------------------------ */
 
 static int cmd_clear(const struct shell *sh, size_t argc, char **argv)
@@ -372,7 +359,7 @@ static int cmd_clear(const struct shell *sh, size_t argc, char **argv)
 }
 
 /* ------------------------------------------------------------------ */
-/* claw wipe */
+/* zbot wipe */
 /* ------------------------------------------------------------------ */
 
 static int cmd_wipe(const struct shell *sh, size_t argc, char **argv)
@@ -385,7 +372,7 @@ static int cmd_wipe(const struct shell *sh, size_t argc, char **argv)
 }
 
 /* ------------------------------------------------------------------ */
-/* claw skill list / run */
+/* zbot skill list / run */
 /* ------------------------------------------------------------------ */
 
 static int cmd_skill_list(const struct shell *sh, size_t argc, char **argv)
@@ -403,7 +390,7 @@ static int cmd_skill_run(const struct shell *sh, size_t argc, char **argv)
 	int rc;
 
 	if (argc < 2) {
-		shell_print(sh, "Usage: claw skill run <name> [arg]");
+		shell_print(sh, "Usage: zbot skill run <name> [arg]");
 		return -EINVAL;
 	}
 
@@ -414,7 +401,7 @@ static int cmd_skill_run(const struct shell *sh, size_t argc, char **argv)
 }
 
 /* ------------------------------------------------------------------ */
-/* claw tools */
+/* zbot tools */
 /* ------------------------------------------------------------------ */
 
 static int cmd_tools(const struct shell *sh, size_t argc, char **argv)
@@ -427,7 +414,7 @@ static int cmd_tools(const struct shell *sh, size_t argc, char **argv)
 
 	tools = tools_get_all(&count);
 
-	shell_print(sh, "=== ZephyrClaw Tools (%d) ===", count);
+	shell_print(sh, "=== zbot Tools (%d) ===", count);
 	for (int i = 0; i < count; i++) {
 		shell_print(sh, "  %-20s %s", tools[i].name, tools[i].description);
 	}
@@ -435,7 +422,7 @@ static int cmd_tools(const struct shell *sh, size_t argc, char **argv)
 }
 
 /* ------------------------------------------------------------------ */
-/* claw wifi connect / disconnect / status                             */
+/* zbot wifi connect / disconnect / status                             */
 /* ------------------------------------------------------------------ */
 
 static int cmd_wifi_connect(const struct shell *sh, size_t argc, char **argv)
@@ -444,7 +431,7 @@ static int cmd_wifi_connect(const struct shell *sh, size_t argc, char **argv)
 	int rc;
 
 	if (argc < 2) {
-		shell_print(sh, "Usage: claw wifi connect <ssid> [passphrase]");
+		shell_print(sh, "Usage: zbot wifi connect <ssid> [passphrase]");
 		shell_print(sh, "Credentials are saved to flash for auto-connect on next boot.");
 		return -EINVAL;
 	}
@@ -478,35 +465,31 @@ static int cmd_wifi_disconnect(const struct shell *sh, size_t argc, char **argv)
 
 static int cmd_wifi_status(const struct shell *sh, size_t argc, char **argv)
 {
-	char ssid[CONFIG_WIFI_SSID_MAX_LEN];
-
 	ARG_UNUSED(argc);
 	ARG_UNUSED(argv);
 
-	config_wifi_get_ssid(ssid, sizeof(ssid));
-	shell_print(sh, "Saved SSID : %s", ssid[0] ? ssid : "(none)");
-	shell_print(sh, "Use 'claw status' for full config including WiFi state.");
+	if (wifi_credentials_is_empty()) {
+		shell_print(sh, "No WiFi credentials saved.");
+		shell_print(sh, "Use: zbot wifi connect <ssid> [pass]");
+	} else {
+		shell_print(sh, "WiFi credentials saved (use 'zbot status' for details).");
+	}
 	return 0;
 }
-
-/* ------------------------------------------------------------------ */
-/* ------------------------------------------------------------------ */
 
 SHELL_STATIC_SUBCMD_SET_CREATE(sub_skill, SHELL_CMD(list, NULL, "List all skills", cmd_skill_list),
 			       SHELL_CMD_ARG(run, NULL, "Run a skill: run <name> [arg]",
 					     cmd_skill_run, 2, 1),
 			       SHELL_SUBCMD_SET_END);
 
-SHELL_STATIC_SUBCMD_SET_CREATE(sub_wifi,
-	SHELL_CMD_ARG(connect, NULL, "Connect: wifi connect <ssid> [pass]",
-		      cmd_wifi_connect, 2, 1),
+SHELL_STATIC_SUBCMD_SET_CREATE(
+	sub_wifi,
+	SHELL_CMD_ARG(connect, NULL, "Connect: wifi connect <ssid> [pass]", cmd_wifi_connect, 2, 1),
 	SHELL_CMD(disconnect, NULL, "Disconnect from current WiFi", cmd_wifi_disconnect),
-	SHELL_CMD(status, NULL, "Show saved WiFi SSID", cmd_wifi_status),
-	SHELL_SUBCMD_SET_END);
+	SHELL_CMD(status, NULL, "Show saved WiFi SSID", cmd_wifi_status), SHELL_SUBCMD_SET_END);
 
 SHELL_STATIC_SUBCMD_SET_CREATE(
-	sub_claw, SHELL_CMD_ARG(key, NULL, "Set API key (RAM only): key <key>", cmd_key, 2, 0),
-	SHELL_CMD(key_save, NULL, "Save API key to flash", cmd_key_save),
+	sub_zbot, SHELL_CMD_ARG(key, NULL, "Set API key: key <key>", cmd_key, 2, 0),
 	SHELL_CMD(key_delete, NULL, "Delete API key from flash", cmd_key_delete),
 	SHELL_CMD_ARG(host, NULL, "Set LLM host: host <hostname>", cmd_host, 2, 0),
 	SHELL_CMD_ARG(path, NULL, "Set API path: path <path>", cmd_path, 2, 0),
@@ -523,4 +506,4 @@ SHELL_STATIC_SUBCMD_SET_CREATE(
 	SHELL_CMD(skill, &sub_skill, "Skill commands", NULL),
 	SHELL_CMD(tools, NULL, "List available tools", cmd_tools), SHELL_SUBCMD_SET_END);
 
-SHELL_CMD_REGISTER(claw, &sub_claw, "ZephyrClaw AI Agent commands", NULL);
+SHELL_CMD_REGISTER(zbot, &sub_zbot, "zbot AI Agent commands", NULL);

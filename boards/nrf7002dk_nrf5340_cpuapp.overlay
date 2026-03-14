@@ -1,6 +1,6 @@
 /*
  * SPDX-License-Identifier: Apache-2.0
- * nRF7002-DK device tree overlay for ZephyrClaw
+ * nRF7002-DK device tree overlay for ZBot
  *
  * Ensures storage_partition exists for NVS.
  * The nRF7002-DK (nRF5340) internal flash layout already includes a

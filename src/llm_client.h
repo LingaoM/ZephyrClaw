@@ -1,9 +1,9 @@
 /*
- * Copyright (c) 2026 LingaoMeng
+ * Copyright (c) 2026 Lingao Meng
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * ZephyrClaw - LLM Client Module
+ * ZBot - LLM Client Module
  *
  * Sends HTTP POST requests to an OpenAI-compatible Chat Completions API
  * using Zephyr's HTTP client. The API key is taken from config at
@@ -13,8 +13,8 @@
  * the assistant's message content and any tool_calls.
  */
 
-#ifndef ZEPHYRCLAW_LLM_CLIENT_H
-#define ZEPHYRCLAW_LLM_CLIENT_H
+#ifndef ZBOT_LLM_CLIENT_H
+#define ZBOT_LLM_CLIENT_H
 
 #include <stddef.h>
 #include <stdbool.h>
@@ -86,11 +86,11 @@ typedef int (*llm_tools_cb_t)(char *buf, size_t buf_len, void *args);
  * @param args         Opaque pointer forwarded to both callbacks.
  * @return 0 on success, negative errno on error.
  */
-int llm_chat(llm_messages_cb_t messages_cb, llm_tools_cb_t tools_cb,
-	     struct llm_response *resp, void *args);
+int llm_chat(llm_messages_cb_t messages_cb, llm_tools_cb_t tools_cb, struct llm_response *resp,
+	     void *args);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* ZEPHYRCLAW_LLM_CLIENT_H */
+#endif /* ZBOT_LLM_CLIENT_H */

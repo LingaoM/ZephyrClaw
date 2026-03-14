@@ -1,9 +1,9 @@
 /*
- * Copyright (c) 2026 LingaoMeng
+ * Copyright (c) 2026 Lingao Meng
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * ZephyrClaw - Agent Module Implementation
+ * ZBot - Agent Module Implementation
  *
  * Implements the ReAct (Reason + Act) loop for tool-augmented LLM interaction.
  */
@@ -19,26 +19,7 @@
 #include "tools.h"
 #include "llm_client.h"
 
-LOG_MODULE_REGISTER(zephyrclaw_agent, LOG_LEVEL_INF);
-
-static const char g_system_prompt[] =
-	"You are ZephyrClaw, an open-source embedded AI agent running on a "
-	"Nordic nRF7002-DK development board powered by Zephyr RTOS. "
-	"You are concise, helpful, and hardware-aware. "
-	"You can control GPIOs, read sensors, and manage the device. "
-	"When using tools, always reason step-by-step before acting. "
-	"Keep responses short and suitable for a serial terminal.";
-
-const char *agent_get_system_prompt(void)
-{
-	return g_system_prompt;
-}
-
-/* ------------------------------------------------------------------ */
-/* ------------------------------------------------------------------ */
-
-static K_MUTEX_DEFINE(g_agent_mutex);
-static volatile bool g_busy = false;
+LOG_MODULE_REGISTER(zbot_agent, LOG_LEVEL_INF);
 
 /* Static buffers (large, stack-allocated per call would overflow) */
 static char g_tool_result[TOOLS_RESULT_MAX_LEN];
@@ -56,10 +37,10 @@ static int summary_messages_cb(char *buf, size_t buf_len, void *args)
 	size_t pos = 0;
 	int n;
 
-	n = snprintf(buf + pos, buf_len - pos,
-		     "[{\"role\":\"system\",\"content\":\"%s\"},", g_system_prompt);
+	n = snprintf(buf + pos, buf_len - pos, "[{\"role\":\"system\",\"content\":\"%s\"},",
+		     AGENT_SYSTEM_PROMPT);
 	if (n < 0 || (size_t)n >= buf_len - pos) {
-		goto too_long;
+		return -ENOMEM;
 	}
 
 	pos += (size_t)n;
@@ -70,30 +51,29 @@ static int summary_messages_cb(char *buf, size_t buf_len, void *args)
 			     "{\"role\":\"assistant\",\"content\":\"Understood.\"},",
 			     ctx->prior);
 		if (n < 0 || pos + (size_t)n >= buf_len) {
-			goto too_long;
+			return -ENOMEM;
 		}
 
 		pos += (size_t)n;
 	}
 
-	n = snprintf(buf + pos, buf_len - pos,
-		     "{\"role\":\"user\",\"content\":\"%s\\n",
+	n = snprintf(buf + pos, buf_len - pos, "{\"role\":\"user\",\"content\":\"%s\\n",
 		     (ctx->prior != NULL)
 			     ? "Update the prior summary to include the following new turns. "
 			       "Keep the result under 3 sentences, factual and concise."
 			     : "Summarise the following conversation in 2-3 sentences "
 			       "for future context. Be factual and concise.");
 	if (n < 0 || pos + (size_t)n >= buf_len) {
-		goto too_long;
+		return -ENOMEM;
 	}
 
 	pos += (size_t)n;
 
 	for (int i = 0; i < ctx->count; i++) {
-		n = snprintf(buf + pos, buf_len - pos, "%s: %s\\n",
-			     ctx->roles[i], ctx->contents[i]);
+		n = snprintf(buf + pos, buf_len - pos, "%s: %s\\n", ctx->roles[i],
+			     ctx->contents[i]);
 		if (n < 0 || pos + (size_t)n >= buf_len) {
-			goto too_long;
+			return -ENOMEM;
 		}
 
 		pos += (size_t)n;
@@ -101,18 +81,13 @@ static int summary_messages_cb(char *buf, size_t buf_len, void *args)
 
 	n = snprintf(buf + pos, buf_len - pos, "\"}]");
 	if (n < 0 || pos + (size_t)n >= buf_len) {
-		goto too_long;
+		return -ENOMEM;
 	}
 
 	pos += (size_t)n;
+
 	return (int)pos;
-
-too_long:
-	return -ENOMEM;
 }
-
-/* ------------------------------------------------------------------ */
-/* ------------------------------------------------------------------ */
 
 int agent_request_summary(agent_format_fn_t format_fn, char *out_buf, size_t out_len)
 {
@@ -145,18 +120,21 @@ int agent_request_summary(agent_format_fn_t format_fn, char *out_buf, size_t out
 	}
 
 	LOG_WRN("agent_request_summary failed: %d", rc);
+
 	return rc != 0 ? rc : -ENODATA;
 }
 
 static int messages_cb(char *buf, size_t buf_len, void *args)
 {
 	ARG_UNUSED(args);
+
 	return memory_build_messages_json(buf, buf_len);
 }
 
 static int tools_cb(char *buf, size_t buf_len, void *args)
 {
 	ARG_UNUSED(args);
+
 	return tools_build_json(buf, buf_len);
 }
 
@@ -183,7 +161,6 @@ static int react_loop(const char *user_input, char *out_buf, size_t out_len)
 
 		/* Call LLM — messages and tools JSON built directly into req_body */
 		rc = llm_chat(messages_cb, tools_cb, &resp, NULL);
-
 		if (rc < 0) {
 			LOG_ERR("LLM call failed: %d", rc);
 			snprintf(out_buf, out_len, "[Error: LLM request failed (%d)]", rc);
@@ -217,7 +194,9 @@ static int react_loop(const char *user_input, char *out_buf, size_t out_len)
 
 		/* Empty response — stop */
 		LOG_WRN("Empty LLM response");
+
 		snprintf(out_buf, out_len, "[No response from model]");
+
 		return -ENODATA;
 	}
 
@@ -235,71 +214,45 @@ static int react_loop(const char *user_input, char *out_buf, size_t out_len)
 
 int agent_init(void)
 {
-	LOG_INF("ZephyrClaw agent initialised (max ReAct iterations: %d)",
-		AGENT_MAX_REACT_ITERATIONS);
+	LOG_INF("zbot agent initialised (max ReAct iterations: %d)", AGENT_MAX_REACT_ITERATIONS);
 
 	return 0;
 }
 
-int agent_run_sync(const char *input, char *out_buf, size_t out_len)
-{
-	int rc;
+static void agent_work_handler(struct k_work *work);
 
-	if (!input || !out_buf) {
-		return -EINVAL;
-	}
-
-	if (k_mutex_lock(&g_agent_mutex, K_MSEC(100)) != 0) {
-		return -EBUSY;
-	}
-
-	g_busy = true;
-	rc = react_loop(input, out_buf, out_len);
-	g_busy = false;
-
-	k_mutex_unlock(&g_agent_mutex);
-	return rc;
-}
+static struct agent_work_item {
+	struct k_work work;
+	char input[AGENT_INPUT_MAX_LEN];
+	struct agent_response_ctx ctx;
+} g_work_item = {
+	.work = Z_WORK_INITIALIZER(agent_work_handler),
+};
 
 bool agent_is_busy(void)
 {
-	return g_busy;
+	return k_work_busy_get(&g_work_item.work) & (K_WORK_RUNNING | K_WORK_QUEUED);
 }
-
-struct agent_work_item {
-	struct k_work work;
-	char input[AGENT_INPUT_MAX_LEN];
-	agent_response_cb cb;
-	void *user_data;
-};
-
-static struct agent_work_item g_work_item;
 
 static void agent_work_handler(struct k_work *work)
 {
 	struct agent_work_item *item = CONTAINER_OF(work, struct agent_work_item, work);
-	static char out_buf[AGENT_OUTPUT_MAX_LEN];
 	int rc;
 
-	g_busy = true;
-	rc = react_loop(item->input, out_buf, sizeof(out_buf));
-	g_busy = false;
+	rc = react_loop(item->input, item->ctx.output, item->ctx.output_length);
 
-	if (item->cb) {
-		if (rc < 0 && out_buf[0] == '\0') {
-			snprintf(out_buf, sizeof(out_buf), "[Agent error: %d]", rc);
-		}
-		item->cb(out_buf, item->user_data);
+	if (item->ctx.cb) {
+		item->ctx.cb(rc, &item->ctx);
 	}
 }
 
-int agent_submit_input(const char *input, agent_response_cb cb, void *user_data)
+int agent_submit_input(const char *input, const struct agent_response_ctx *ctx)
 {
-	if (!input || strlen(input) == 0) {
+	if (!input || strlen(input) == 0 || !ctx || !ctx->output) {
 		return -EINVAL;
 	}
 
-	if (g_busy) {
+	if (agent_is_busy()) {
 		LOG_WRN("Agent is busy");
 		return -EBUSY;
 	}
@@ -311,10 +264,9 @@ int agent_submit_input(const char *input, agent_response_cb cb, void *user_data)
 
 	strncpy(g_work_item.input, input, AGENT_INPUT_MAX_LEN - 1);
 	g_work_item.input[AGENT_INPUT_MAX_LEN - 1] = '\0';
-	g_work_item.cb = cb;
-	g_work_item.user_data = user_data;
 
-	k_work_init(&g_work_item.work, agent_work_handler);
+	g_work_item.ctx = *ctx;
+
 	k_work_submit(&g_work_item.work);
 
 	return 0;

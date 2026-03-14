@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2026 LingaoMeng
+ * Copyright (c) 2026 Lingao Meng
  * SPDX-License-Identifier: Apache-2.0
  *
- * ZephyrClaw - Main Entry Point
+ * ZBot - Main Entry Point
  *
  * Boot sequence:
- *   1. memory_init()  — NVS mount, load persisted summary ("zc/summary")
+ *   1. memory_init()  — NVS mount, load persisted summary ("zbot/summary")
  *   2. config_init()  — load API key + WiFi credentials from flash, trigger
  *                       auto-connect if credentials were previously saved
  *   3. skills_register_builtins()
  *   4. agent_init()
  *   5. Register WiFi event callback (connect/disconnect notifications)
  *   6. Print welcome banner
- *   7. Idle — all interaction via Shell commands (claw ...)
+ *   7. Idle — all interaction via Shell commands (zbot ...)
  *
  * WiFi:
- *   Use 'claw wifi connect <ssid> [pass]' to connect and save credentials.
+ *   Use 'zbot wifi connect <ssid> [pass]' to connect and save credentials.
  *   On next boot, config_init() auto-connects using the saved credentials.
  *
  * API key:
- *   'claw key <key>'      — set in RAM for this session
- *   'claw key-save'       — persist to flash (optional)
+ *   'zbot key <key>'      — set in RAM for this session
+ *   'zbot key-save'       — persist to flash (optional)
  */
 
 #include <zephyr/kernel.h>
@@ -35,10 +35,7 @@
 #include "skill.h"
 #include "tools.h"
 
-LOG_MODULE_REGISTER(zephyrclaw_main, LOG_LEVEL_INF);
-
-/* ------------------------------------------------------------------ */
-/* ------------------------------------------------------------------ */
+LOG_MODULE_REGISTER(zbot_main, LOG_LEVEL_INF);
 
 #define WIFI_MGMT_EVENTS (NET_EVENT_WIFI_CONNECT_RESULT | NET_EVENT_WIFI_DISCONNECT_RESULT)
 
@@ -64,41 +61,35 @@ static void wifi_event_handler(struct net_mgmt_event_callback *cb, uint64_t mgmt
 	}
 }
 
-/* ------------------------------------------------------------------ */
-/* ------------------------------------------------------------------ */
-
 static void print_banner(void)
 {
 	printk("\n");
 	printk("╔══════════════════════════════════════════════╗\n");
-	printk("║        ZephyrClaw - Embedded AI Agent        ║\n");
+	printk("║        ZBot - Embedded AI Agent              ║\n");
 	printk("║   Board: nRF7002-DK  |  RTOS: Zephyr         ║\n");
 	printk("║   Version: 0.1.0     |  License: Apache-2.0  ║\n");
 	printk("╚══════════════════════════════════════════════╝\n");
 	printk("\n");
 	printk("Quick start:\n");
 	printk("  1. Connect to WiFi (saves credentials for auto-connect):\n");
-	printk("       claw wifi connect <SSID> <password>\n");
+	printk("       zbot wifi connect <SSID> <password>\n");
 	printk("  2. Set API key:\n");
-	printk("       claw key sk-...          -- RAM only (cleared on reboot)\n");
-	printk("       claw key-save            -- also persist to flash\n");
+	printk("       zbot key sk-...          -- RAM only (cleared on reboot)\n");
+	printk("       zbot key-save            -- also persist to flash\n");
 	printk("  3. [Optional] Change model/endpoint:\n");
-	printk("       claw model gpt-4o-mini\n");
-	printk("       claw host api.openai.com\n");
+	printk("       zbot model gpt-4o-mini\n");
+	printk("       zbot host api.openai.com\n");
 	printk("  4. Chat:\n");
-	printk("       claw chat Hello! What can you do?\n");
+	printk("       zbot chat Hello! What can you do?\n");
 	printk("  5. Other commands:\n");
-	printk("       claw status              -- show config + WiFi SSID\n");
-	printk("       claw wifi status         -- show saved WiFi SSID\n");
-	printk("       claw history             -- show conversation\n");
-	printk("       claw summary             -- show NVS summary\n");
-	printk("       claw skill list\n");
-	printk("       claw tools\n");
+	printk("       zbot status              -- show config + WiFi SSID\n");
+	printk("       zbot wifi status         -- show saved WiFi SSID\n");
+	printk("       zbot history             -- show conversation\n");
+	printk("       zbot summary             -- show NVS summary\n");
+	printk("       zbot skill list\n");
+	printk("       zbot tools\n");
 	printk("\n");
 }
-
-/* ------------------------------------------------------------------ */
-/* ------------------------------------------------------------------ */
 
 int main(void)
 {
@@ -144,7 +135,7 @@ int main(void)
 		k_sleep(K_SECONDS(30));
 
 		if (g_wifi_connected) {
-			LOG_DBG("Heartbeat — WiFi up, agent %s", agent_is_busy() ? "busy" : "idle");
+			LOG_DBG("Heartbeat — WiFi up");
 		}
 	}
 

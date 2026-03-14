@@ -1,9 +1,9 @@
 /*
- * Copyright (c) 2026 LingaoMeng
+ * Copyright (c) 2026 Lingao Meng
  *
  * SPDX-License-Identifier: Apache-2.0
  *
- * ZephyrClaw - Tools Module Implementation
+ * ZBot - Tools Module Implementation
  */
 
 #include <zephyr/kernel.h>
@@ -18,7 +18,7 @@
 
 #include "tools.h"
 
-LOG_MODULE_REGISTER(zephyrclaw_tools, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(zbot_tools, LOG_LEVEL_INF);
 
 /* ------------------------------------------------------------------ */
 /* GPIO aliases from nRF7002-DK device tree */
@@ -135,9 +135,6 @@ static int json_get_str(const char *json, const char *key, char *out, size_t out
 	return (int)i;
 }
 
-/* ------------------------------------------------------------------ */
-/* ------------------------------------------------------------------ */
-
 int tool_gpio_read(const char *args_json, char *result, size_t res_len)
 {
 	ensure_gpio_init();
@@ -234,7 +231,7 @@ int tool_get_board_info(const char *args_json, char *result, size_t res_len)
 		 "\"soc\":\"nRF5340\","
 		 "\"wifi_chip\":\"nRF7002\","
 		 "\"rtos\":\"Zephyr\","
-		 "\"agent\":\"ZephyrClaw\","
+		 "\"agent\":\"zbot\","
 		 "\"version\":\"0.1.0\"}");
 	return 0;
 }
@@ -270,9 +267,6 @@ int tool_echo(const char *args_json, char *result, size_t res_len)
 	snprintf(result, res_len, "{\"echo\":\"%s\"}", message);
 	return 0;
 }
-
-/* ------------------------------------------------------------------ */
-/* ------------------------------------------------------------------ */
 
 static const struct tool_descriptor g_tools[] = {
 	{
